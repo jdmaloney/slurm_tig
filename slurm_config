@@ -1,0 +1,5 @@
+slurm_path="" ## Prefix of path to slurm commands
+username="" ## Username to authenticate to the MariaDB housing Slurm data
+password="" ## Password to authenticate to the MariaDB housing Slurm data
+database="" ## Name of slurm database
+job_table="" ## Name of table in MariaDB database that houses job data
