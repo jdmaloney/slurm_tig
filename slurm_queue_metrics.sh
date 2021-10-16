@@ -8,7 +8,8 @@
 tfile=$(mktemp /tmp/slurm_node.XXXXXX)
 tfile2=$(mktemp /tmp/squeue.XXXXXX)
 tfile3=$(mktemp /tmp/nodeinfo.XXXXXX)
-slurm_path="/usr/slurm/bin"
+
+source /etc/telegraf/slurm_config
 
 ##Dump info about all running jobs into a temp file; get the list of all nodes in the system
 "${slurm_path}"/squeue -t running -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile2}"

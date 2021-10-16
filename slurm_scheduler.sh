@@ -4,7 +4,7 @@
 ## Can run on any host that can query the scheduler
 ## Put telegraf in admin group so it can see all queues; or add telegraf to sudoers and modify script to execute slurm commands with sudo
 
-slurm_path="/usr/slurm/bin"
+source /etc/telegraf/slurm_config
 partitions=($("${slurm_path}"/sinfo -h | awk '{print $1}' | sort -u | xargs | sed 's/*//g'))
 
 ## Get data
