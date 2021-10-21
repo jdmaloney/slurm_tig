@@ -25,7 +25,6 @@ do
 		core_time=$((from_core_days+from_core_time))
 	fi
 
-	echo "${j}"
 	echo "slurm_job_efficiency,user=${user},group=${group},partition=${partition} cpu_efficiency=${cpu_efficiency},mem_efficiency=${mem_efficiency},core_time=${core_time} ${end_time}"
 done
 
