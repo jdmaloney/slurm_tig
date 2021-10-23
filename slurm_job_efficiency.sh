@@ -12,8 +12,8 @@ do
 	group=$(grep "User/Group" ${tfile} | cut -d'/' -f 3)
 	cpu_efficiency=$(grep "CPU Efficiency:" ${tfile} | cut -d' ' -f 3 | cut -d'%' -f 1)
 	mem_efficiency=$(grep "Memory Efficiency:" ${tfile} | cut -d' ' -f 3 | cut -d'%' -f 1)
-	partition=$(${slurm_path}/sacct -P -X -n -o partition%20 -j ${j})
-	end_stamp=$(${slurm_path}/sacct -P -X -n -o End -j ${j})
+	partition=$(${slurm_path}/sacct -P -X -n -o partition%20 -j ${j} | head -n 1)
+	end_stamp=$(${slurm_path}/sacct -P -X -n -o End -j ${j} | sort -r | head -n 1)
 	new_end_time=$(date -d "${end_stamp}" +%s%N | head -n 1)
 	if [ -z ${end_time} ] || [ ${new_end_time} -ne ${end_time} ]; then
 		end_time="${new_end_time}"
