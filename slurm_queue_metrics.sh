@@ -1,15 +1,11 @@
 #!/bin/bash
 
-## Slurm Per Queue Metrics
-## Can run on any host that can query the scheduler
-## Put telegraf in admin group so it can see all queues; or add telegraf to sudoers and modify script to execute slurm commands with sudo
-
 ## Setup temp files and define path to slurm
 tfile=$(mktemp /tmp/slurm_node.XXXXXX)
 tfile2=$(mktemp /tmp/squeue.XXXXXX)
 tfile3=$(mktemp /tmp/nodeinfo.XXXXXX)
-
-source /etc/telegraf/slurm_config
+tfile4=$(mktemp /tmp/pending.XXXXXX)
+slurm_path="/usr/slurm/bin"
 
 ##Dump info about all running jobs into a temp file; get the list of all nodes in the system
 "${slurm_path}"/squeue -t running -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile2}"
@@ -161,22 +157,78 @@ do
 	echo "slurm_detail_node_data,node=${n},partition=all job_count=${job_count_agg},cores_used=${cores_used_agg},mem_allocated=${mem_used_agg},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used_agg},gpu_avail_total=${gpu_avail}"
 done
 
+##Dump info about all pending jobs into a temp file
+"${slurm_path}"/squeue -t pending -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile}"
+
+## Loop over that list of jobs running and get the data formatted in consistent way
+while read -r p; do
+	if [ -z "$(echo "${p}" | cut -d',' -f 3- | grep "gpu=")" ]; then
+		mem_len=$(echo "${p}" | cut -d'=' -f 3 | sed 's/[^0-9\.]*//g' | wc -c)
+                mem=$(echo "${p}" | cut -d'=' -f 3 | cut -c 1-"${mem_len}")
+		if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
+	                mem_allocated=$(echo "${mem}" | cut -d'M' -f 1)
+        	elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
+	                t_alloc=$(echo "${mem}" | cut -d'G' -f 1)
+	                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024" | bc -l)
+	        else
+	                t_alloc=$(echo "${mem}" | cut -d'T' -f 1)
+	                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024 * 1024" | bc -l)
+	        fi
+		cpu="$(echo "${p}" | cut -d'=' -f 2 | cut -d',' -f 1)"
+		partition="$(echo "${p}" | cut -d',' -f 1)"
+		user_name=$(echo "${p}" | rev | cut -d',' -f 2 | rev)
+		echo "${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
+	else
+		mem_len=$(echo "${p}" | cut -d'=' -f 3 | sed 's/[^0-9\.]*//g' | wc -c)
+                mem=$(echo "${p}" | cut -d'=' -f 3 | cut -c 1-"${mem_len}")
+                if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
+                                mem_allocated=$(echo "${mem}" | cut -d'M' -f 1)
+                        elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
+                                t_alloc=$(echo "${mem}" | cut -d'G' -f 1)
+                                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024" | bc -l)
+                        else
+                                t_alloc=$(echo "${mem}" | cut -d'T' -f 1)
+                                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024 * 1024" | bc -l)
+                        fi
+                        cpu=$(echo "${p}" | cut -d'=' -f 2 | cut -d',' -f 1)
+			gpu=$(echo "${p}" | cut -d',' -f 6 | cut -d'=' -f 2)
+                        partition=$(echo "${p}" | cut -d',' -f 1)
+			user_name=$(echo "${p}" | rev | cut -d',' -f 2 | rev)
+			echo "${partition},${cpu},${mem_allocated},${gpu},${user_name}" >> "${tfile4}"
+
+		fi
+done <"${tfile}"
+
 ## User Roll Up Stats
-users_running=($(cat ${tfile3} | rev | cut -d',' -f 1 | rev | sort -u | xargs))
-for u in ${users_running[@]}
+users_with_jobs=($(cat ${tfile3} ${tfile4} | rev | cut -d',' -f 1 | rev | sort -u | xargs))
+for u in ${users_with_jobs[@]}
 do
 	grep ",${u}" "${tfile3}" > "${tfile2}"
+	grep ",${u}" "${tfile4}" > "${tfile}"
 	user_p=($(cat ${tfile2} | cut -d',' -f 2 | sort -u | xargs))
 	for p in ${user_p[@]}
 	do
 		cores_used=$(awk -v part=${p} -F, '$2 == part {print $3}' ${tfile2} | paste -sd+ | bc)
 		mem_used=$(awk -v part=${p} -F, '$2 == part {print $4}' ${tfile2} | paste -sd+ | bc)
 		gpu_used=$(awk -v part=${p} -F, '$2 == part {print $5}' ${tfile2} | paste -sd+ | bc)
-		echo "slurm_user_resource_data,partition=${p},username=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used}"
 	done
+	if [ $(cat ${tfile} | wc -l) -eq 0 ]; then
+		cores_pending=0
+		mem_pending=0
+		gpu_pending=0
+	fi
+	user_p=($(cat ${tfile} | cut -d',' -f 1 | sort -u | xargs))
+        for p in ${user_p[@]}
+        do
+                cores_pending=$(awk -v part=${p} -F, '$1 == part {print $2}' ${tfile} | paste -sd+ | bc)
+                mem_pending=$(awk -v part=${p} -F, '$1 == part {print $3}' ${tfile} | paste -sd+ | bc)
+                gpu_pending=$(awk -v part=${p} -F, '$1 == part {print $4}' ${tfile} | paste -sd+ | bc)
+        done
+	echo "slurm_user_resource_data,partition=${p},username=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used},cores_pending=${cores_pending},mem_pending=${mem_pending},gpu_pending=${gpu_pending}"
 done
 
 
 rm -rf "${tfile}"
 rm -rf "${tfile2}"
 rm -rf "${tfile3}"
+rm -rf "${tfile4}"
