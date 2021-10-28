@@ -205,6 +205,11 @@ for u in ${users_with_jobs[@]}
 do
 	grep ",${u}" "${tfile3}" > "${tfile2}"
 	grep ",${u}" "${tfile4}" > "${tfile}"
+        if [ $(cat ${tfile2} | wc -l) -eq 0 ]; then
+                cores_used=0
+                mem_used=0
+                gpu_used=0
+        fi
 	user_p=($(cat ${tfile2} | cut -d',' -f 2 | sort -u | xargs))
 	for p in ${user_p[@]}
 	do
