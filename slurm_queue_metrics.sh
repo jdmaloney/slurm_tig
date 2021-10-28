@@ -1,11 +1,12 @@
 #!/bin/bash
 
+source /etc/telegraf/slurm_config
+
 ## Setup temp files and define path to slurm
 tfile=$(mktemp /tmp/slurm_node.XXXXXX)
 tfile2=$(mktemp /tmp/squeue.XXXXXX)
 tfile3=$(mktemp /tmp/nodeinfo.XXXXXX)
 tfile4=$(mktemp /tmp/pending.XXXXXX)
-slurm_path="/usr/slurm/bin"
 
 ##Dump info about all running jobs into a temp file; get the list of all nodes in the system
 "${slurm_path}"/squeue -t running -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile2}"
@@ -232,6 +233,24 @@ do
 	echo "slurm_user_resource_data,partition=${p},username=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used},cores_pending=${cores_pending},mem_pending=${mem_pending},gpu_pending=${gpu_pending}"
 done
 
+## Job Time Pending Data
+mysql -u ${username} -p${password} -D ${database} -e "select id_user,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_user;" | grep -v id_user > ${tfile}
+while read -r p; do
+	IFS=" " read id_user partition max_pending_time avg_pending_time <<< "$(echo ${p})"
+	user=$(getent passwd ${id_user} | cut -d':' -f 1)
+	if [[ ${user} == [a-z]* ]]; then
+		echo "slurm_pending_job_data,partition=${partition},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+	fi
+done < "${tfile}"
+
+mysql -u ${username} -p${password} -D ${database} -e "select id_group,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_group;" | grep -v id_group > ${tfile}
+while read -r p; do
+        IFS=" " read id_group partition max_pending_time avg_pending_time <<< "$(echo ${p})"
+        groupname=$(getent group ${id_group} | cut -d':' -f 1)
+        if [[ ${groupname} == [a-z]* ]]; then
+                echo "slurm_pending_job_data,partition=${partition},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+        fi
+done < "${tfile}"
 
 rm -rf "${tfile}"
 rm -rf "${tfile2}"
