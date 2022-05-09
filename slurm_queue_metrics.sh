@@ -238,7 +238,7 @@ mysql -u ${username} -p${password} -D ${database} -e "select id_user,\`partition
 while read -r p; do
 	IFS=" " read id_user partition max_pending_time avg_pending_time <<< "$(echo ${p})"
 	user=$(getent passwd ${id_user} | cut -d':' -f 1)
-	if [[ ${user} == [a-z]* ]]; then
+	if [[ ${user} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
 		echo "slurm_pending_job_data,partition=${partition},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
 	fi
 done < "${tfile}"
@@ -247,7 +247,7 @@ mysql -u ${username} -p${password} -D ${database} -e "select id_group,\`partitio
 while read -r p; do
         IFS=" " read id_group partition max_pending_time avg_pending_time <<< "$(echo ${p})"
         groupname=$(getent group ${id_group} | cut -d':' -f 1)
-        if [[ ${groupname} == [a-z]* ]]; then
+        if [[ ${groupname} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
                 echo "slurm_pending_job_data,partition=${partition},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
         fi
 done < "${tfile}"
