@@ -37,7 +37,7 @@ do
 		fi
 
 		if [ "${core_time}" -ne 0 ]; then
-		echo "slurm_job_efficiency,user=${user},group=${group},partition=${partition} cpu_efficiency=${cpu_efficiency},mem_efficiency=${mem_efficiency},core_time=${core_time} ${real_end_time}"
+		echo "slurm_job_efficiency,user=${user},group=${group},partition=${partition} cpu_efficiency=${cpu_efficiency},mem_efficiency=${mem_efficiency},core_time=${core_time},jobid=${j} ${real_end_time}"
 		fi
 	fi
 done
