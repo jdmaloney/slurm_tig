@@ -1,6 +1,14 @@
 #!/bin/bash
 
-source /etc/telegraf/slurm_config
+source /etc/telegraf/scripts/slurm/slurm_config
+
+if [ -z "$password" ]
+then
+  # ASSUME NO PASSWORD NECESSARY, e.g. USING SOCKET
+  mysqlpass=""
+else
+  mysqlpass="-p${password}"
+fi
 
 ## Setup temp files and define path to slurm
 tfile=$(mktemp /tmp/slurm_node.XXXXXX)
@@ -46,7 +54,7 @@ while read -r p; do
 			done
 		## Job uses a GPU(s) so run this
                 else
-			mem_len=$(echo "${p}" | cut -d'=' -f 3 | grep -o -E '[0-9]+' | head -1 | wc -c)
+			mem_len=$(echo "${p}" | cut -d'=' -f 3 | sed 's/[^0-9\.]*//g' | wc -c)
                         mem=$(echo "${p}" | cut -d'=' -f 3 | cut -c 1-"${mem_len}")
                         if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
                                 t_alloc=$(echo "${mem}" | cut -d'M' -f 1)
@@ -206,12 +214,12 @@ for u in ${users_with_jobs[@]}
 do
 	grep ",${u}" "${tfile3}" > "${tfile2}"
 	grep ",${u}" "${tfile4}" > "${tfile}"
-        if [ $(cat ${tfile2} | wc -l) -eq 0 ]; then
-                cores_used=0
+	user_p=($(cat ${tfile2} | cut -d',' -f 2 | sort -u | xargs))
+	if [ $(cat ${tfile2} | wc -l) -eq 0 ]; then
+        	cores_used=0
                 mem_used=0
                 gpu_used=0
         fi
-	user_p=($(cat ${tfile2} | cut -d',' -f 2 | sort -u | xargs))
 	for p in ${user_p[@]}
 	do
 		cores_used=$(awk -v part=${p} -F, '$2 == part {print $3}' ${tfile2} | paste -sd+ | bc)
@@ -234,7 +242,7 @@ do
 done
 
 ## Job Time Pending Data
-mysql -u ${username} -p${password} -D ${database} -e "select id_user,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_user;" | grep -v id_user > ${tfile}
+mysql -u ${username}  ${mysqlpass} -D ${database} -e "select id_user,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_user;" | grep -v id_user > ${tfile}
 while read -r p; do
 	IFS=" " read id_user partition max_pending_time avg_pending_time <<< "$(echo ${p})"
 	user=$(getent passwd ${id_user} | cut -d':' -f 1)
@@ -243,14 +251,15 @@ while read -r p; do
 	fi
 done < "${tfile}"
 
-mysql -u ${username} -p${password} -D ${database} -e "select id_group,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_group;" | grep -v id_group > ${tfile}
+mysql -u ${username}  ${mysqlpass} -D ${database} -e "select id_group,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_group;" | grep -v id_group > ${tfile}
 while read -r p; do
         IFS=" " read id_group partition max_pending_time avg_pending_time <<< "$(echo ${p})"
         groupname=$(getent group ${id_group} | cut -d':' -f 1)
-        if [[ ${groupname} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
+	if [[ ${groupname} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
                 echo "slurm_pending_job_data,partition=${partition},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
         fi
 done < "${tfile}"
+
 
 rm -rf "${tfile}"
 rm -rf "${tfile2}"

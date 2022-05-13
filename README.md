@@ -5,7 +5,7 @@ These exec scripts are used to ingest scheduler, partition, job metrics from a S
 This check provides basic partition stats as well as stats about the scheduler itself and how well it is performing by capturing its internal metrics.  Implementation details:
 - For telegraf (the user that'll execute this shell script) to see all jobs it needs to be in the admin group so it can see all jobs, or you can give the telgraf user sudo permission to run slurm commands and modify this script to invoke sudo on all scheduler commands.  It is recommended to just add Telegraf's user (by default "telegraf") to the admin group as that is simpler generally, cleaner, and a bit more safe.  
 
-## Slurm Queue Metrics
+## Slurm Detail Stats
 This check gathers data in more detail on a per partition basis, tracking the breakdown of cpu/memory/gpu utilization in a partition on a per user basis, as well as utilization down to the core, GB of memory, and GPU level.  Also it tracks pending jobs by state to help quickly see why jobs aren't running.  Same implementation detail applies to this check as the above; telegraf must in some way get to admin status so it can see all jobs in the queue.  
 
 ## Slurm Job Efficiency
