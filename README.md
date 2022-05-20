@@ -14,5 +14,5 @@ This check records job efficiency data, tracking how efficient users and groups 
 - Credentials/DB Info about connecting to your slurmdbd is needed in the slurm_config file.  This allows the script to reach out and connect to it and pull in information
 - By default this check is meant to be run every hour, and it will pull in data from completed jobs for the hour prior.  If you want to adjust the frequency of the data ingestion, make sure to also alter the SQL query.
 
-## Slurm Accounting Stats (BETA)
-This check pulls in historical job information resource utilization (core hours, gb_mem hours, and gpu hours) on a per user/charge account/partition basis and stores this in InfluxDB.  The check is meant to be run on an hourly basis to pull in metrics for jobs that completed their run in the hour prior. This check is in BETA as it currently is not set to map userids to "pretty" usernames, this feature will hopefully be landing soon.
+## Slurm Accounting Stats
+This check pulls in historical job information resource utilization (core hours, gb_mem hours, and gpu hours) on a per user/charge account/partition basis and stores this in InfluxDB.  The check is meant to be run on an hourly basis to pull in metrics for jobs that completed their run in the hour prior.
