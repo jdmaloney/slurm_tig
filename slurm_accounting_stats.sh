@@ -1,7 +1,7 @@
 #!/bin/bash
 
 tfile=$(mktemp /tmp/sacct.XXXXXX)
-source /etc/telegraf/slurm/slurm_config
+source /etc/telegraf/scripts/slurm/slurm_config
 
 if [ -z "$password" ]
 then
@@ -12,14 +12,20 @@ else
 fi
 
 ## Get data into temp files for parsing
-mysql -u ${username} ${mysqlpass} -D ${database} -e "select id_user,account,\`partition\`,tres_req,(time_end - time_start), time_end from ${job_table} where time_end != '0' and array_task_pending = '0'" | sed 's/\t/:/g' > ${tfile}
+mysql -u ${username} ${mysqlpass} -D ${database} -e "select id_user,account,\`partition\`,tres_req,(time_end - time_start), time_end from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 2 hour) and exit_code = '0' and array_task_pending = '0'" | tail -n +2 | sed 's/\t/:/g' > ${tfile}
 mysql -u ${username} ${mysqlpass} -D ${database} -e "select id,type,\`name\` from tres_table where deleted = '0'" | sed 's/\t/:/g' > ${tfile}.tres
 
-old_job_end=""
-many_same=""
+old_job_end=0
+many_same=0
+id_user=""
 while IFS= read -r line; do
 	resource_usage_string=""
 	IFS=":" read -r id_user account partition tres_raw job_time_seconds job_end_time <<< "${line}"
+
+	## Map username
+	if [ "${id_user}" != "${old_id_user}" ]; then
+		pretty_id_user=$(getent passwd ${id_user} | cut -d':' -f 1)
+	fi
 
 	## Handle jobs that end at same exact second by incrementing their timestamp by 1 microsecond
 	njob_end_time="${job_end_time}000"
@@ -58,5 +64,8 @@ while IFS= read -r line; do
 
 	## Clean up the resource string and echo final output
 	resource_usage_string=$(echo ${resource_usage_string} | cut -d',' -f 2- | sed 's/__/_/g')
-	echo "slurm_job_accounting_data,partition=${partition},user=${id_user},account=${account} ${resource_usage_string} ${njob_end_time}"
+	old_id_user=${id_user}
+	echo "slurm_job_accounting_data,partition=${partition},user=${pretty_id_user},account=${account} ${resource_usage_string} ${njob_end_time}"
 done < <(cat "${tfile}")
+
+rm -rf "${tfile}"
