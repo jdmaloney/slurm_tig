@@ -32,8 +32,8 @@ while IFS= read -r line; do
                 job_time_seconds=$((job_end_time-job_time_eligible))
         fi
 
-	## Handle jobs that end at same exact second by incrementing their timestamp by 1 microsecond
-	njob_end_time="${job_end_time}000"
+	## Handle jobs that end at same exact second by incrementing their timestamp by 1 nanosecond
+	njob_end_time="${job_end_time}000000000"
 	if [ ${old_job_end} -eq ${job_end_time} ]; then
 		if [ ${many_same} -eq 0 ]; then
 			add_num=1
@@ -70,7 +70,9 @@ while IFS= read -r line; do
 	## Clean up the resource string and echo final output
 	resource_usage_string=$(echo ${resource_usage_string} | cut -d',' -f 2- | sed 's/__/_/g')
 	old_id_user=${id_user}
-	echo "slurm_job_accounting_data,partition=${partition},user=${pretty_id_user},account=${account} ${resource_usage_string} ${njob_end_time}"
+        if [ -n "${partition}" ]; then
+                echo "slurm_job_accounting_data,partition=${partition},user=${pretty_id_user},account=${account} ${resource_usage_string} ${njob_end_time}"
+        fi
 done < <(cat "${tfile}")
 
-rm -rf "${tfile}"
+rm -rf "${tfile}" && rm -rf "${tfile}".tres
