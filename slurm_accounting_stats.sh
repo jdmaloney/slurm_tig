@@ -12,7 +12,7 @@ else
 fi
 
 ## Get data into temp files for parsing
-mysql -u ${username} ${mysqlpass} -D ${database} -e "select id_user,account,\`partition\`,tres_req,(time_end - time_start), time_end from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 2 hour) and exit_code = '0' and array_task_pending = '0'" | tail -n +2 | sed 's/\t/:/g' > ${tfile}
+mysql -u ${username} ${mysqlpass} -D ${database} -e "select id_user,account,\`partition\`,tres_req,(time_end - time_start), time_end, time_eligible, time_start from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 2 hour) and exit_code = '0' and array_task_pending = '0'" | tail -n +2 | sed 's/\t/:/g' > ${tfile}
 mysql -u ${username} ${mysqlpass} -D ${database} -e "select id,type,\`name\` from tres_table where deleted = '0'" | sed 's/\t/:/g' > ${tfile}.tres
 
 old_job_end=0
@@ -26,6 +26,11 @@ while IFS= read -r line; do
 	if [ "${id_user}" != "${old_id_user}" ]; then
 		pretty_id_user=$(getent passwd ${id_user} | cut -d':' -f 1)
 	fi
+
+	## Handle jobs with start time of 0
+        if [ ${job_start_time} -eq 0 ]; then
+                job_time_seconds=$((job_end_time-job_time_eligible))
+        fi
 
 	## Handle jobs that end at same exact second by incrementing their timestamp by 1 microsecond
 	njob_end_time="${job_end_time}000"
