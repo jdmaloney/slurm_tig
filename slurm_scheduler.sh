@@ -22,13 +22,17 @@ echo "slurm_nodesumdata,partition=all,type=idle count=${nodes_idle}"
 echo "slurm_nodesumdata,partition=all,type=offline count=${nodes_offline}"
 echo "slurm_nodesumdata,partition=all,type=total count=${nodes_total}"
 
+max_jobs=$("${slurm_path}"/scontrol show config | grep MaxJobCount | cut -d' ' -f 15)
 total_jobs=$(cat $tf | wc -l)
 running_jobs=$(cat $tf | grep RUNNING | wc -l )
 pending_jobs=$(cat $tf | grep PENDING | wc -l )
+percent_max=$(echo "${total_jobs} / ${max_jobs} *100" | bc -l)
 
 echo "slurm_jobsumdata,partition=all,type=running count=${running_jobs}"
 echo "slurm_jobsumdata,partition=all,type=pending count=${pending_jobs}"
 echo "slurm_jobsumdata,partition=all,type=total count=${total_jobs}"
+echo "slurm_jobsumdata,partition=all,type=max count=${max_jobs}"
+echo "slurm_jobsumdata,partition=all,type=percent_of_max percent=${percent_max}"
 
 pend_line="slurm_jobsumdata,partition=all,type=pendingbyreason "
 found_pending=0
