@@ -5,14 +5,17 @@
 ## Put telegraf in admin group so it can see all queues; or add telegraf to sudoers and modify script to execute slurm commands with sudo
 
 source /etc/telegraf/slurm_config
-partitions=($("${slurm_path}"/sinfo -h | awk '{print $1}' | sort -u | xargs | sed 's/*//g'))
-
-## Get data
 tf=$(mktemp /tmp/slurm1.XXXXXX)
 qf=$(mktemp /tmp/slurm2.XXXXXX)
-"${slurm_path}"/squeue -a -h -l > $tf
-"${slurm_path}"/squeue -h -l -O Partition,Username,State > $qf
+partitions=($({time "${slurm_path}"/sinfo -h | awk '{print $1}' | sort -u | xargs | sed 's/*//g';} 2> ${tf}.time))
+sinfo_response=$(awk '$1 == "real" {print $2}' ${tf}.time | sed 's/.*m\(.*\)s/\1/')
 
+## Get data
+{ time "${slurm_path}"/squeue -a -h -l;} 2> ${tf}.time 1> $tf
+"${slurm_path}"/squeue -h -l -O Partition,Username,State > $qf
+squeue_response=$(awk '$1 == "real" {print $2}' ${tf}.time | sed 's/.*m\(.*\)s/\1/')
+
+echo "slurm_responsiveness squeue_response_seconds=${squeue_response},sinfo_response_seconds=${sinfo_response}"
 
 ##Aggregate Node Stats
 IFS="/" read nodes_busy nodes_idle nodes_offline nodes_total <<< "$("${slurm_path}"/sinfo -h -o %F)"
