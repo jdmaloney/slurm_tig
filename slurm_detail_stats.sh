@@ -167,45 +167,32 @@ do
 done
 
 ##Dump info about all pending jobs into a temp file
-"${slurm_path}"/squeue -t pending -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile}"
+"${slurm_path}"/squeue -t pending -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' > "${tfile}"
 
 ## Loop over that list of jobs running and get the data formatted in consistent way
 while read -r p; do
-	if [ -z "$(echo "${p}" | cut -d',' -f 3- | grep "gpu=")" ]; then
-		mem_len=$(echo "${p}" | cut -d'=' -f 3 | sed 's/[^0-9\.]*//g' | wc -c)
-                mem=$(echo "${p}" | cut -d'=' -f 3 | cut -c 1-"${mem_len}")
-		if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
-	                mem_allocated=$(echo "${mem}" | cut -d'M' -f 1)
-        	elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
-	                t_alloc=$(echo "${mem}" | cut -d'G' -f 1)
-	                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024" | bc -l)
+	if [ -z "$(echo "${p}" | grep "gres/gpu=")" ]; then
+		IFS=" " read -r partition cpu mem mem_unit user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$(NF-1)}')
+		if [ "${mem_unit}" == "M" ]; then
+	                mem_allocated=${mem}
+        	elif [ "${mem_unit}" == "G" ]; then
+	                mem_allocated=$(echo "scale=0; ${mem} * 1024" | bc -l)
 	        else
-	                t_alloc=$(echo "${mem}" | cut -d'T' -f 1)
-	                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024 * 1024" | bc -l)
+	                mem_allocated=$(echo "scale=0; ${mem} * 1024 * 1024" | bc -l)
 	        fi
-		cpu="$(echo "${p}" | cut -d'=' -f 2 | cut -d',' -f 1)"
-		partition="$(echo "${p}" | cut -d',' -f 1)"
-		user_name=$(echo "${p}" | rev | cut -d',' -f 2 | rev)
 		echo "${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
 	else
-		mem_len=$(echo "${p}" | cut -d'=' -f 3 | sed 's/[^0-9\.]*//g' | wc -c)
-                mem=$(echo "${p}" | cut -d'=' -f 3 | cut -c 1-"${mem_len}")
-                if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
-                                mem_allocated=$(echo "${mem}" | cut -d'M' -f 1)
-                        elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
-                                t_alloc=$(echo "${mem}" | cut -d'G' -f 1)
-                                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024" | bc -l)
-                        else
-                                t_alloc=$(echo "${mem}" | cut -d'T' -f 1)
-                                mem_allocated=$(echo "scale=0; ${t_alloc} * 1024 * 1024" | bc -l)
-                        fi
-                        cpu=$(echo "${p}" | cut -d'=' -f 2 | cut -d',' -f 1)
-			gpu=$(echo "${p}" | cut -d',' -f 6 | cut -d'=' -f 2)
-                        partition=$(echo "${p}" | cut -d',' -f 1)
-			user_name=$(echo "${p}" | rev | cut -d',' -f 2 | rev)
-			echo "${partition},${cpu},${mem_allocated},${gpu},${user_name}" >> "${tfile4}"
+		IFS=" " read -r partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$6" "$(NF-1)}' | sed 's/gpu=//g')
+                if [ "${mem}" == "M" ]; then
+                        mem_allocated=${mem}
+                elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
+                        mem_allocated=$(echo "scale=0; ${mem} * 1024" | bc -l)
+                else
+                        mem_allocated=$(echo "scale=0; ${mem} * 1024 * 1024" | bc -l)
+                fi
+		echo "${partition},${cpu},${mem_allocated},${gpu},${user_name}" >> "${tfile4}"
 
-		fi
+	fi
 done <"${tfile}"
 
 ## User Roll Up Stats
