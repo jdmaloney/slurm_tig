@@ -182,7 +182,7 @@ while read -r p; do
 	        fi
 		echo "${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
 	else
-		IFS=" " read -r partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$6" "$(NF-1)}' | sed 's/gpu=//g')
+		IFS=" " read -r partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$7" "$(NF-1)}' | sed 's/gpu=//g')
                 if [ "${mem}" == "M" ]; then
                         mem_allocated=${mem}
                 elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
