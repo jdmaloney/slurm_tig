@@ -167,7 +167,7 @@ do
 done
 
 ##Dump info about all pending jobs into a temp file
-"${slurm_path}"/squeue -t pending -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' > "${tfile}"
+"${slurm_path}"/squeue -t pending -O Partition,NodeList:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' > "${tfile}"
 
 ## Loop over that list of jobs running and get the data formatted in consistent way
 while read -r p; do
@@ -180,9 +180,17 @@ while read -r p; do
 	        else
 	                mem_allocated=$(echo "scale=0; ${mem} * 1024 * 1024" | bc -l)
 	        fi
-		echo "${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
+		if [ -n $(echo ${partition} | grep ";") ]; then
+			parts_for_job=($(echo ${partition} | sed 's/;/\ /g'))
+			for p in ${parts_for_job[@]}
+			do
+				echo "${p},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
+			done
+		else
+			echo "${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
+		fi	
 	else
-		IFS=" " read -r partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$7" "$(NF-1)}' | sed 's/gpu=//g')
+		IFS=" " read -r partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$7" "$(NF-1)}')
                 if [ "${mem}" == "M" ]; then
                         mem_allocated=${mem}
                 elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
@@ -190,8 +198,16 @@ while read -r p; do
                 else
                         mem_allocated=$(echo "scale=0; ${mem} * 1024 * 1024" | bc -l)
                 fi
-		echo "${partition},${cpu},${mem_allocated},${gpu},${user_name}" >> "${tfile4}"
-
+		gpus=$(echo ${gpu} | sed 's/[^[:digit:]]\+//g')
+                if [ -n $(echo ${partition} | grep ";") ]; then
+                        parts_for_job=($(echo ${partition} | sed 's/;/\ /g'))
+                        for z in ${parts_for_job[@]}
+                        do
+                                echo "${z},${cpu},${mem_allocated},${gpus},${user_name}" >> "${tfile4}"
+                        done
+                else
+                        echo "${partition},${cpu},${mem_allocated},${gpus},${user_name}" >> "${tfile4}"
+                fi
 	fi
 done <"${tfile}"
 
@@ -199,33 +215,31 @@ done <"${tfile}"
 users_with_jobs=($(cat ${tfile3} ${tfile4} | rev | cut -d',' -f 1 | rev | sort -u | xargs))
 for u in ${users_with_jobs[@]}
 do
-	grep ",${u}" "${tfile3}" > "${tfile2}"
+	grep ",${u}" "${tfile3}" | cut -d',' -f 2- > "${tfile2}"
 	grep ",${u}" "${tfile4}" > "${tfile}"
-	user_p=($(cat ${tfile2} | cut -d',' -f 2 | sort -u | xargs))
-	if [ $(cat ${tfile2} | wc -l) -eq 0 ]; then
-        	cores_used=0
-                mem_used=0
-                gpu_used=0
-        fi
-	for p in ${user_p[@]}
-	do
-		cores_used=$(awk -v part=${p} -F, '$2 == part {print $3}' ${tfile2} | paste -sd+ | bc)
-		mem_used=$(awk -v part=${p} -F, '$2 == part {print $4}' ${tfile2} | paste -sd+ | bc)
-		gpu_used=$(awk -v part=${p} -F, '$2 == part {print $5}' ${tfile2} | paste -sd+ | bc)
-	done
-	if [ $(cat ${tfile} | wc -l) -eq 0 ]; then
-		cores_pending=0
-		mem_pending=0
-		gpu_pending=0
-	fi
-	user_p=($(cat ${tfile} | cut -d',' -f 1 | sort -u | xargs))
+	user_p=($(cat ${tfile} ${tfile2} | cut -d',' -f 1 | sort -u | xargs))
         for p in ${user_p[@]}
         do
-                cores_pending=$(awk -v part=${p} -F, '$1 == part {print $2}' ${tfile} | paste -sd+ | bc)
-                mem_pending=$(awk -v part=${p} -F, '$1 == part {print $3}' ${tfile} | paste -sd+ | bc)
-                gpu_pending=$(awk -v part=${p} -F, '$1 == part {print $4}' ${tfile} | paste -sd+ | bc)
-        done
-	echo "slurm_user_resource_data,partition=${p},username=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used},cores_pending=${cores_pending},mem_pending=${mem_pending},gpu_pending=${gpu_pending}"
+		if [ $(awk -v part=${p} -F, '$1 == part {print $0}' ${tfile2} | wc -l) -eq 0 ]; then
+	        	cores_used=0
+	                mem_used=0
+	                gpu_used=0
+		else
+	                cores_used=$(awk -v part=${p} -F, '$1 == part {print $2}' ${tfile2} | paste -sd+ | bc)
+	                mem_used=$(awk -v part=${p} -F, '$1 == part {print $3}' ${tfile2} | paste -sd+ | bc)
+	                gpu_used=$(awk -v part=${p} -F, '$1 == part {print $4}' ${tfile2} | paste -sd+ | bc)
+	        fi
+	        if [ $(awk -v part=${p} -F, '$1 == part {print $0}' ${tfile} | wc -l) -eq 0 ]; then
+	                cores_pending=0
+	                mem_pending=0
+	                gpu_pending=0
+		else
+	                cores_pending=$(awk -v part=${p} -F, '$1 == part {print $2}' ${tfile} | paste -sd+ | bc)
+	                mem_pending=$(awk -v part=${p} -F, '$1 == part {print $3}' ${tfile} | paste -sd+ | bc)
+	                gpu_pending=$(awk -v part=${p} -F, '$1 == part {print $4}' ${tfile} | paste -sd+ | bc)
+	        fi
+		echo "slurm_user_resource_data,partition=${p},username=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used},cores_pending=${cores_pending},mem_pending=${mem_pending},gpu_pending=${gpu_pending}"
+	done
 done
 
 ## Job Time Pending Data
@@ -234,7 +248,15 @@ while read -r p; do
 	IFS=" " read id_user partition max_pending_time avg_pending_time <<< "$(echo ${p})"
 	user=$(getent passwd ${id_user} | cut -d':' -f 1)
 	if [[ ${user} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
-		echo "slurm_pending_job_data,partition=${partition},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+		if [ -n $(echo ${partition} | grep ",") ]; then
+			parts_for_job=($(echo ${partition} | sed 's/,/\ /g'))
+                        for z in ${parts_for_job[@]}
+                        do
+				echo "slurm_pending_job_data,partition=${z},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+			done
+		else
+			echo "slurm_pending_job_data,partition=${partition},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+		fi
 	fi
 done < "${tfile}"
 
@@ -242,8 +264,16 @@ mysql -u ${username}  ${mysqlpass} -D ${database} -e "select id_group,\`partitio
 while read -r p; do
         IFS=" " read id_group partition max_pending_time avg_pending_time <<< "$(echo ${p})"
         groupname=$(getent group ${id_group} | cut -d':' -f 1)
-	if [[ ${groupname} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
-                echo "slurm_pending_job_data,partition=${partition},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+        if [[ ${groupname} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
+                if [ -n $(echo ${partition} | grep ",") ]; then
+                        parts_for_job=($(echo ${partition} | sed 's/,/\ /g'))
+                        for z in ${parts_for_job[@]}
+                        do
+				echo "slurm_pending_job_data,partition=${z},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+			done
+		else
+	                echo "slurm_pending_job_data,partition=${partition},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+		fi
         fi
 done < "${tfile}"
 
