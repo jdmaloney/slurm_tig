@@ -243,7 +243,7 @@ do
 done
 
 ## Job Time Pending Data
-mysql -u ${username}  ${mysqlpass} -D ${database} -e "select id_user,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_user;" | grep -v id_user > ${tfile}
+mysql -u ${username}  ${mysqlpass} -D ${database} -e "select id_user,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_eligible) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_eligible) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' and time_eligible <= UNIX_TIMESTAMP(NOW()) group by \`partition\`,id_user;" | grep -v id_user > ${tfile}
 while read -r p; do
 	IFS=" " read id_user partition max_pending_time avg_pending_time <<< "$(echo ${p})"
 	user=$(getent passwd ${id_user} | cut -d':' -f 1)
@@ -252,31 +252,45 @@ while read -r p; do
 			parts_for_job=($(echo ${partition} | sed 's/,/\ /g'))
                         for z in ${parts_for_job[@]}
                         do
-				echo "slurm_pending_job_data,partition=${z},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+				echo "slurm_pending_job_data,partition=${z},user=${user},type=pending max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
 			done
 		else
-			echo "slurm_pending_job_data,partition=${partition},user=${user} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+			echo "slurm_pending_job_data,partition=${partition},user=${user},type=pending max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
 		fi
 	fi
 done < "${tfile}"
 
-mysql -u ${username}  ${mysqlpass} -D ${database} -e "select id_group,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_submit) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_submit) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' group by \`partition\`,id_group;" | grep -v id_group > ${tfile}
+mysql -u ${username}  ${mysqlpass} -D ${database} -e "select account,\`partition\`,MAX(UNIX_TIMESTAMP(NOW())-time_eligible) as "MAX_PENDING_TIME",AVG(UNIX_TIMESTAMP(NOW())-time_eligible) as "AVG_PENDING_TIME" from ${job_table} where state = 'pending' and time_eligible <= UNIX_TIMESTAMP(NOW()) group by \`partition\`,account;" | grep -v account > ${tfile}
 while read -r p; do
-        IFS=" " read id_group partition max_pending_time avg_pending_time <<< "$(echo ${p})"
-        groupname=$(getent group ${id_group} | cut -d':' -f 1)
-        if [[ ${groupname} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
+        IFS=" " read account partition max_pending_time avg_pending_time <<< "$(echo ${p})"
+        if [[ ${account} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
                 if [ -n $(echo ${partition} | grep ",") ]; then
                         parts_for_job=($(echo ${partition} | sed 's/,/\ /g'))
                         for z in ${parts_for_job[@]}
                         do
-				echo "slurm_pending_job_data,partition=${z},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+				echo "slurm_pending_job_data,partition=${z},account=${account},type=pending max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
 			done
 		else
-	                echo "slurm_pending_job_data,partition=${partition},group=${groupname} max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+	                echo "slurm_pending_job_data,partition=${partition},account=${account},type=pending max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
 		fi
         fi
 done < "${tfile}"
 
+mysql -u ${username}  ${mysqlpass} -D ${database} -e "select \`partition\`,MAX(time_start-time_eligible) as "MAX_PENDING_TIME",AVG(time_start-time_eligible) as "AVG_PENDING_TIME" from ${job_table} where time_start >= (UNIX_TIMESTAMP(NOW())-300) group by \`partition\`;" | grep -v partition > ${tfile}
+while read -r p; do
+        IFS=" " read partition max_pending_time avg_pending_time <<< "$(echo ${p})"
+        if [[ ${account} == [a-z]* ]] && [[ ${partition} == [a-z]* ]]; then
+                if [ -n $(echo ${partition} | grep ",") ]; then
+                        parts_for_job=($(echo ${partition} | sed 's/,/\ /g'))
+                        for z in ${parts_for_job[@]}
+                        do
+                                echo "slurm_pending_job_data,partition=${z},type=started max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+                        done
+                else
+                        echo "slurm_pending_job_data,partition=${partition},type=started max_pending_time=${max_pending_time},avg_pending_time=${avg_pending_time}"
+                fi
+        fi
+done < "${tfile}"
 
 rm -rf "${tfile}"
 rm -rf "${tfile2}"
