@@ -81,10 +81,10 @@ do
 		count_running=$(awk -v u="$u" '$2==u {print $0}' ${tfile2} | awk -v p="$p" '$1==p {print $0}' | awk '$3 == "RUNNING"' |  wc -l)
 		count_pending=$(awk -v u="$u" '$2==u {print $0}' ${tfile2} | awk -v p="$p" '$1==p {print $0}' | awk '$3 == "PENDING"' | wc -l)
 		if [ $count_running -ne 0 ]; then
-			echo "slurm_userjobdata,partition=${p},type=running,username=${u} count=$count_running"
+			echo "slurm_userjobdata,partition=${p},type=running,user=${u} count=$count_running"
 		fi
 		if [ $count_pending -ne 0 ]; then
-                        echo "slurm_userjobdata,partition=${p},type=pending,username=${u} count=$count_pending"
+                        echo "slurm_userjobdata,partition=${p},type=pending,user=${u} count=$count_pending"
                 fi
 	done
 
