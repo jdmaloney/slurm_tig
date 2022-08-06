@@ -64,12 +64,7 @@ do
 	IFS="/" read alloc_nodes idle_nodes offline_nodes total_nodes <<< "$("${slurm_path}"/sinfo -h --partition="$p" -o %F)"
 
 	if [ -z "${alloc_nodes}" ]; then
-		precent_offline=0
-		offline_nodes=0
-		alloc_nodes=0
-		idle_nodes=0
-		total_nodes=0
-		echo "slurm_nodedata,partition=${p} nodes_busy=${alloc_nodes},nodes_idle=${idle_nodes},nodes_offline=${offline_nodes},nodes_total=${total_nodes},percent_offline=${percent_offline}"
+		echo "slurm_nodedata,partition=${p} nodes_busy=0,nodes_idle=0,nodes_offline=0,nodes_total=0,percent_offline=0"
 	else
 		percent_offline=$(echo "${offline_nodes} / ${total_nodes} * 100" | bc -l)
 		echo "slurm_nodedata,partition=${p} nodes_busy=${alloc_nodes},nodes_idle=${idle_nodes},nodes_offline=${offline_nodes},nodes_total=${total_nodes},percent_offline=${percent_offline}"
