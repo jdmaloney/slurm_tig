@@ -1,9 +1,9 @@
 #!/bin/bash
 
 tfile=$(mktemp /tmp/seff.XXXXXX)
-source /etc/telegraf/slurm_config
+source /etc/telegraf/slurm/slurm_config
 
-jobs=($(mysql -u ${username} -p${password} -D ${database} -e "select id_job,account from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 5 hour) and exit_code = '0' and array_task_pending = '0'" | grep -v id_job | sed 's/\t/:/'))
+jobs=($(mysql -u ${username} -p${password} -D ${database} -e "select id_job,account from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 1 hour) and exit_code = '0' and array_task_pending = '0'" | grep -v id_job | sed 's/\t/:/'))
 
 for j in ${jobs[@]}
 do

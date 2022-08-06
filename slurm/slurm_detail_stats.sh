@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /etc/telegraf/scripts/slurm/slurm_config
+source /etc/telegraf/slurm/slurm_config
 
 if [ -z "$password" ]
 then

@@ -4,7 +4,7 @@
 ## Can run on any host that can query the scheduler
 ## Put telegraf in admin group so it can see all queues; or add telegraf to sudoers and modify script to execute slurm commands with sudo
 
-source /etc/telegraf/slurm_config
+source /etc/telegraf/slurm/slurm_config
 tfile1=$(mktemp /tmp/slurm1.XXXXXX)
 tfile2=$(mktemp /tmp/slurm2.XXXXXX)
 
