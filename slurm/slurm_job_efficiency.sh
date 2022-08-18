@@ -14,30 +14,32 @@ do
 	mem_efficiency=$(grep "Memory Efficiency:" ${tfile} | cut -d' ' -f 3 | cut -d'%' -f 1)
 	partition=$(${slurm_path}/sacct -P -X -n -o partition%20 -j ${jobid} | head -n 1)
 	end_stamp=$(${slurm_path}/sacct -P -X -n -o End -j ${jobid} | sort -r | head -n 1)
-	if [ ${end_stamp} != "Unknown" ]; then
-		new_end_time=$(date -d "${end_stamp}" +%s%N | head -n 1)
-		if [ -z ${end_time} ] || [ ${new_end_time} -ne ${end_time} ]; then
-			end_time="${new_end_time}"
-			real_end_time="${new_end_time}"
-			n=0
-		else
-			n=$((n+1))
-			mult=$((6000000*n))
-			end_time="${new_end_time}"
-			real_end_time=$((new_end_time+mult))
-		fi
-		raw_time=$(grep "CPU Efficiency:" ${tfile} | cut -d' ' -f 5)
-		if [ -z "$(echo ${raw_time} | grep "-")" ]; then
-			## Less than 1 day of core time
-			core_time=$(echo ${raw_time} | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
-		else
-			from_core_days=$(echo ${raw_time} | awk -F- '{print ($1 *86400) }')
-			from_core_time=$(echo ${raw_time} | cut -d'-' -f 2 | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
-			core_time=$((from_core_days+from_core_time))
-		fi
-
-		if [ "${core_time}" -ne 0 ]; then
-		echo "slurm_job_efficiency,user=${user},account=${account},partition=${partition} cpu_efficiency=${cpu_efficiency},mem_efficiency=${mem_efficiency},core_time=${core_time},jobid=${jobid} ${real_end_time}"
+	if [ ${cpu_efficiency} -le 100 ] || [ ${mem_efficiency} -le 100 ]; then
+		if [ ${end_stamp} != "Unknown" ]; then
+			new_end_time=$(date -d "${end_stamp}" +%s%N | head -n 1)
+			if [ -z ${end_time} ] || [ ${new_end_time} -ne ${end_time} ]; then
+				end_time="${new_end_time}"
+				real_end_time="${new_end_time}"
+				n=0
+			else
+				n=$((n+1))
+				mult=$((6000000*n))
+				end_time="${new_end_time}"
+				real_end_time=$((new_end_time+mult))
+			fi
+			raw_time=$(grep "CPU Efficiency:" ${tfile} | cut -d' ' -f 5)
+			if [ -z "$(echo ${raw_time} | grep "-")" ]; then
+				## Less than 1 day of core time
+				core_time=$(echo ${raw_time} | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+			else
+				from_core_days=$(echo ${raw_time} | awk -F- '{print ($1 *86400) }')
+				from_core_time=$(echo ${raw_time} | cut -d'-' -f 2 | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+				core_time=$((from_core_days+from_core_time))
+			fi
+	
+			if [ "${core_time}" -ne 0 ]; then
+			echo "slurm_job_efficiency,user=${user},account=${account},partition=${partition} cpu_efficiency=${cpu_efficiency},mem_efficiency=${mem_efficiency},core_time=${core_time},jobid=${jobid} ${real_end_time}"
+			fi
 		fi
 	fi
 done
