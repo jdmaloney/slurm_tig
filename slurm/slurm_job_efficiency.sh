@@ -14,7 +14,7 @@ do
 	mem_efficiency=$(grep "Memory Efficiency:" ${tfile} | cut -d' ' -f 3 | cut -d'%' -f 1)
 	partition=$(${slurm_path}/sacct -P -X -n -o partition%20 -j ${jobid} | head -n 1)
 	end_stamp=$(${slurm_path}/sacct -P -X -n -o End -j ${jobid} | sort -r | head -n 1)
-	if [ $(echo $cpu_efficiency | cut -d'.' -f 1) -le 100 ] || [ $(echo $mem_efficiency | cut -d'.' -f 1) -le 100 ]; then
+	if [ $(echo $cpu_efficiency | cut -d'.' -f 1) -le 100 ] && [ $(echo $mem_efficiency | cut -d'.' -f 1) -le 100 ]; then
 		if [ ${end_stamp} != "Unknown" ]; then
 			new_end_time=$(date -d "${end_stamp}" +%s%N | head -n 1)
 			if [ -z ${end_time} ] || [ ${new_end_time} -ne ${end_time} ]; then
