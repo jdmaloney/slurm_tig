@@ -12,7 +12,7 @@ else
 fi
 
 ## Get data into temp files for parsing
-mysql -u ${username} ${mysqlpass} -D ${database} -e "select id_user,account,\`partition\`,tres_req,(time_end - time_start), time_end, time_eligible, time_start from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 2 hour) and exit_code = '0' and array_task_pending = '0'" | tail -n +2 | sed 's/\t/:/g' > ${tfile}
+mysql -u ${username} ${mysqlpass} -D ${database} -e "select id_user,account,\`partition\`,tres_req,(time_end - time_start), time_end, time_eligible, time_start from ${job_table} where time_end > UNIX_TIMESTAMP(now() - interval 1 hour) and array_task_pending = '0'" | tail -n +2 | sed 's/\t/:/g' > ${tfile}
 mysql -u ${username} ${mysqlpass} -D ${database} -e "select id,type,\`name\` from tres_table where deleted = '0'" | sed 's/\t/:/g' > ${tfile}.tres
 
 old_job_end=0
@@ -20,7 +20,7 @@ many_same=0
 id_user=""
 while IFS= read -r line; do
 	resource_usage_string=""
-	IFS=":" read -r id_user account partition tres_raw job_time_seconds job_end_time <<< "${line}"
+	IFS=":" read -r id_user account partition tres_raw job_time_seconds job_end_time job_time_eligible job_start_time <<< "${line}"
 
 	## Map username
 	if [ "${id_user}" != "${old_id_user}" ]; then
