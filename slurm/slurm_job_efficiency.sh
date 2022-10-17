@@ -12,7 +12,7 @@ do
 	user=$(grep "User/Group" ${tfile} | cut -d'/' -f 2 | cut -d' ' -f 2)
 	cpu_efficiency=$(grep "CPU Efficiency:" ${tfile} | cut -d' ' -f 3 | cut -d'%' -f 1)
 	mem_efficiency=$(grep "Memory Efficiency:" ${tfile} | cut -d' ' -f 3 | cut -d'%' -f 1)
-	walltime_efficiency=$(echo "scale=4; ${walltime}/${timelimit}*100" | bc -l)
+	walltime_efficiency=$(echo "scale=4; ${walltime}/${timelimit}/60*100" | bc -l)
 	partition=$(${slurm_path}/sacct -P -X -n -o partition%20 -j ${jobid} | head -n 1)
 	end_stamp=$(${slurm_path}/sacct -P -X -n -o End -j ${jobid} | sort -r | head -n 1)
 	if [ $(echo $cpu_efficiency | cut -d'.' -f 1) -le 100 ] && [ $(echo $mem_efficiency | cut -d'.' -f 1) -le 100 ]; then
