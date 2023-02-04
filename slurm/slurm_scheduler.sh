@@ -7,6 +7,7 @@
 source /etc/telegraf/slurm/slurm_config
 tfile1=$(mktemp /tmp/slurm1.XXXXXX)
 tfile2=$(mktemp /tmp/slurm2.XXXXXX)
+tfile3=$(mktemp /tmp/slurm3.XXXXXX)
 
 ## Get data and measure slurm's responsiveness while doing so
 partitions=($({ time "${slurm_path}"/sinfo -h | awk '{print $1}' | sort -u | xargs | sed 's/*//g';} 2>${tfile1}.time))
@@ -21,6 +22,7 @@ echo "slurm_responsiveness squeue_response_seconds=${squeue_response},sinfo_resp
 ## Aggregate Node Stats
 IFS="/" read nodes_busy nodes_idle nodes_offline nodes_total <<< "$("${slurm_path}"/sinfo -h -o %F)"
 echo "slurm_nodesumdata,partition=all nodes_busy=${nodes_busy},nodes_idle=${nodes_idle},nodes_offline=${nodes_offline},nodes_total=${nodes_total}"
+${slurm_path}/sinfo -o %R,%D,%T | tr -cd '[:alnum:],-_\n' > "${tfile3}"
 
 max_jobs=$("${slurm_path}"/scontrol show config | grep MaxJobCount | cut -d' ' -f 15)
 total_jobs=$(cat ${tfile1} | wc -l)
@@ -60,6 +62,17 @@ do
                 final_pend_line=$(echo ${pend_line} | sed 's/\ ,/\ /')
                 echo "${final_pend_line}"
         fi
+
+	state_string=""
+        states=($(grep ^${p}, ${tfile3} | cut -d',' -f 3 | sort | uniq))
+        for s in ${states[@]}
+        do
+                count=$(grep ^${p}, ${tfile3} | grep ,${s}$ | cut -d',' -f 2 | paste -sd+ | bc)
+                state_string="${state_string},${s}=${count}"
+        done
+        final_state=$(echo ${state_string} | cut -c 2-)
+
+        echo "slurm_partition_node_state,partition=${p} ${final_state}"
 
 	IFS="/" read alloc_nodes idle_nodes offline_nodes total_nodes <<< "$("${slurm_path}"/sinfo -h --partition="$p" -o %F)"
 
@@ -102,4 +115,4 @@ else
 	echo "slurm_scheduler_data slurm_server_thread_count=${slurm_server_thread_count},slurm_agent_queue_size=${slurm_agent_queue_size},slurm_agent_count=${slurm_agent_count},slurm_agent_thread_count=${slurm_agent_thread_count},slurm_dbd_agent_queue_size=${slurm_dbd_agent_queue_size},slurm_jobs_submitted=${slurm_jobs_submitted},slurm_jobs_started=${slurm_jobs_started},slurm_jobs_completed=${slurm_jobs_completed},slurm_jobs_canceled=${slurm_jobs_canceled},slurm_jobs_failed=${slurm_jobs_failed},slurm_last_cycle_time=${slurm_last_cycle_time},slurm_max_cycle_time=${slurm_max_cycle_time},slurm_total_cycles=${slurm_total_cycles},slurm_mean_cycle=${slurm_mean_cycle},slurm_mean_depth_cycle=${slurm_mean_depth_cycle},slurm_cycles_per_minute=${slurm_cycles_per_minute},slurm_last_queue_length=${slurm_last_queue_length},slurm_tot_backfill_jobs_from_start=${slurm_tot_backfill_jobs_from_start},slurm_tot_backfill_jobs_from_cycle=${slurm_tot_backfill_jobs_from_cycle},slurm_backfill_het_job_components=${slurm_backfill_het_job_components},slurm_total_cycles_backfill=${slurm_total_cycles_backfill},slurm_last_cycle_backfill=${slurm_last_cycle_backfill},slurm_max_cycle_backfill=${slurm_max_cycle_backfill},slurm_mean_cycle_backfill=${slurm_mean_cycle_backfill},slurm_last_depth_cycle_backfill=${slurm_last_depth_cycle_backfill},slurm_last_depth_cycle_try_backfill=${slurm_last_depth_cycle_try_backfill},slurm_depth_mean_backfill=${slurm_depth_mean_backfill},slurm_depth_mean_try_backfill=${slurm_depth_mean_try_backfill},slurm_last_queue_length_backfill=${slurm_last_queue_length_backfill},slurm_queue_length_mean_backfill=${slurm_queue_length_mean_backfill},slurm_last_table_size_backfill=${slurm_last_table_size_backfill},slurm_last_mean_table_size_backfill=${slurm_last_mean_table_size_backfill}"
 fi
 
-rm -rf ${tfile1}* ${tfile2}
+rm -rf ${tfile1} ${tfile2} ${tfile3}
