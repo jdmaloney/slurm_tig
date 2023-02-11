@@ -119,13 +119,21 @@ while read -r p; do
 done <"${tfile2}"
 
 ## Node Roll Up Stats
-"${slurm_path}"/scontrol show nodes | grep 'NodeName\|CfgTRES' > "${tfile}"
+"${slurm_path}"/scontrol show nodes | grep 'NodeName\|CfgTRES\|State' > "${tfile}"
 "${slurm_path}"/sinfo -N > "${tfile2}"
 for n in "${all_node_list[@]}"
 do
-	cores_avail=$(grep -A1 "NodeName=${n}" "${tfile}" | grep CfgTRES | cut -d'=' -f 3- | cut -d',' -f 1)
-	mem=$(grep -A1 "NodeName=${n}" "${tfile}" | grep CfgTRES | cut -d',' -f 2 | cut -d'=' -f 2)
-        if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
+	cores_avail=$(grep -A2 "NodeName=${n}" "${tfile}" | grep CfgTRES | cut -d'=' -f 3- | cut -d',' -f 1)
+        mem=$(grep -A2 "NodeName=${n}" "${tfile}" | grep CfgTRES | cut -d',' -f 2 | cut -d'=' -f 2)
+        master_state=$(grep -A1 "NodeName=${n}" "${tfile}" | grep State | cut -d'=' -f 2 | awk '{print $1}')
+        if [ -n "$(echo ${master_state} | grep "+")" ]; then
+                primary_state=$(echo "${master_state}" | cut -d'+' -f 1)
+                other_states=$(echo "${master_state}" | cut -d'+' -f 2-)
+        else
+                primary_state="${master_state}"
+                other_states="none"
+        fi
+	if [ "$(echo "${mem}" | rev | cut -c 1)" == "M" ]; then
         	mem_avail=$(echo "${mem}" | cut -d'M' -f 1)
         elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
                 t_alloc=$(echo "${mem}" | cut -d'G' -f 1)
@@ -161,7 +169,7 @@ do
 			mem_used_agg=$(echo "${mem_used_agg} + ${mem_allocated}" | bc -l)
 			gpu_used_agg=$(echo "${gpu_used_agg} + ${gpu_used}" | bc -l)
 		fi
-		echo "slurm_detail_node_data,node=${n},partition=${real_p} job_count=${job_count},cores_used=${cores_used},mem_allocated=${mem_allocated},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used},gpu_avail_total=${gpu_avail}"
+		echo "slurm_detail_node_data,node=${n},partition=${real_p} job_count=${job_count},cores_used=${cores_used},mem_allocated=${mem_allocated},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used},gpu_avail_total=${gpu_avail},master_state=${master_state},primary_state=${primary_state},other_states=${other_states}"
 	done
 	echo "slurm_detail_node_data,node=${n},partition=all job_count=${job_count_agg},cores_used=${cores_used_agg},mem_allocated=${mem_used_agg},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used_agg},gpu_avail_total=${gpu_avail}"
 done
