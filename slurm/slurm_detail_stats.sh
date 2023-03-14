@@ -175,7 +175,7 @@ do
 done
 
 ##Dump info about all pending jobs into a temp file
-"${slurm_path}"/squeue -t pending -O Partition:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' > "${tfile}"
+"${slurm_path}"/squeue -t pending -O Partition:50,NodeList:250,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' > "${tfile}"
 
 ## Loop over that list of jobs running and get the data formatted in consistent way
 while read -r p; do
