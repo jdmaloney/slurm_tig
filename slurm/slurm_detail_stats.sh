@@ -142,8 +142,8 @@ do
                 t_alloc=$(echo "${mem}" | cut -d'T' -f 1)
                 mem_avail=$(echo "scale=0; ${t_alloc} * 1024 * 1024" | bc -l)
         fi
-	if [ -n "$(grep -A1 "NodeName=${n}" "${tfile}" | grep "gpu=")" ]; then
-		gpu_avail=$(grep -A1 "NodeName=${n}" "${tfile}" | grep CfgTRES | cut -d',' -f 4 | cut -d'=' -f 2)
+	if [ -n "$(grep -A2 "NodeName=${n}" "${tfile}" | grep "gpu=")" ]; then
+		gpu_avail=$(grep -A2 "NodeName=${n}" "${tfile}" | grep CfgTRES | cut -d',' -f 4 | cut -d'=' -f 2)
 	else
 		gpu_avail=0
 	fi
