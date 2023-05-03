@@ -155,16 +155,16 @@ do
 	for p in "${partitions_on_node[@]}"
 	do
 		real_p=$(echo "${p}" | sed 's/*//g')
-		job_count=$(grep "${n},${real_p}" "${tfile3}" | wc -l)
+		job_count=$(grep "${n},${real_p}," "${tfile3}" | wc -l)
 		job_count_agg=$((job_count_agg+job_count))
 		if [ "${job_count}" == "0" ]; then
 			cores_used=0
 			mem_allocated=0
 			gpu_used=0
 		else
-			cores_used=$(grep "${n},${real_p}" "${tfile3}" | cut -d',' -f 3 | paste -sd+ - | bc)
-			mem_allocated=$(grep "${n},${real_p}" "${tfile3}" | cut -d',' -f 4 | paste -sd+ - | bc)
-			gpu_used=$(grep "${n},${real_p}" "${tfile3}" | cut -d',' -f 5 | paste -sd+ - | bc)
+			cores_used=$(grep "${n},${real_p}," "${tfile3}" | cut -d',' -f 3 | paste -sd+ - | bc)
+			mem_allocated=$(grep "${n},${real_p}," "${tfile3}" | cut -d',' -f 4 | paste -sd+ - | bc)
+			gpu_used=$(grep "${n},${real_p}," "${tfile3}" | cut -d',' -f 5 | paste -sd+ - | bc)
 			cores_used_agg=$((cores_used_agg+cores_used))
 			mem_used_agg=$(echo "${mem_used_agg} + ${mem_allocated}" | bc -l)
 			gpu_used_agg=$(echo "${gpu_used_agg} + ${gpu_used}" | bc -l)
