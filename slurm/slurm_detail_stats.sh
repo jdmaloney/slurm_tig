@@ -175,12 +175,12 @@ do
 done
 
 ##Dump info about all pending jobs into a temp file
-"${slurm_path}"/squeue -t pending -O Partition:50,NodeList:250,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' > "${tfile}"
+"${slurm_path}"/squeue -t pending -O Partition:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' | sort | uniq -c | sed 's/\ /,/g' | sed 's/^,*//' > "${tfile}"
 
 ## Loop over that list of jobs running and get the data formatted in consistent way
 while read -r p; do
 	if [ -z "$(echo "${p}" | grep "gres/gpu=")" ]; then
-		IFS=" " read -r partition cpu mem mem_unit user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$(NF-1)}')
+		IFS=" " read -r job_count partition cpu mem mem_unit user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$5" "$(NF-1)}')
 		if [ "${mem_unit}" == "M" ]; then
 	                mem_allocated=${mem}
         	elif [ "${mem_unit}" == "G" ]; then
@@ -192,14 +192,14 @@ while read -r p; do
 			parts_for_job=($(echo ${partition} | sed 's/;/\ /g'))
 			for p in ${parts_for_job[@]}
 			do
-				echo "${p},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
+				echo "${p},${cpu},${mem_allocated},0,${user_name},${job_count}" >> "${tfile4}"
 			done
 		else
-			echo "${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile4}"
-		fi	
+			echo "${partition},${cpu},${mem_allocated},0,${user_name},${job_count}" >> "${tfile4}"
+		fi
 	else
-		IFS=" " read -r partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$(NF-2)" "$(NF-1)}')
-                if [ "${mem}" == "M" ]; then
+		IFS=" " read -r job_count partition cpu mem mem_unit gpu user_name <<< $(echo ${p} | awk -F , '{print $1" "$2" "$3" "$4" "$5" "$(NF-2)" "$(NF-1)}')
+		if [ "${mem}" == "M" ]; then
                         mem_allocated=${mem}
                 elif [ "$(echo "${mem}" | rev | cut -c 1)" == "G" ]; then
                         mem_allocated=$(echo "scale=0; ${mem} * 1024" | bc -l)
@@ -207,24 +207,24 @@ while read -r p; do
                         mem_allocated=$(echo "scale=0; ${mem} * 1024 * 1024" | bc -l)
                 fi
 		gpus=$(echo ${gpu} | sed 's/[^[:digit:]]\+//g')
-                if [ -n $(echo ${partition} | grep ";") ]; then
+		if [ -n $(echo ${partition} | grep ";") ]; then
                         parts_for_job=($(echo ${partition} | sed 's/;/\ /g'))
                         for z in ${parts_for_job[@]}
                         do
-                                echo "${z},${cpu},${mem_allocated},${gpus},${user_name}" >> "${tfile4}"
+                                echo "${z},${cpu},${mem_allocated},${gpus},${job_count},${user_name}," >> "${tfile4}"
                         done
                 else
-                        echo "${partition},${cpu},${mem_allocated},${gpus},${user_name}" >> "${tfile4}"
+                        echo "${partition},${cpu},${mem_allocated},${gpus},${job_count},${user_name}," >> "${tfile4}"
                 fi
 	fi
 done <"${tfile}"
 
 ## User Roll Up Stats
-users_with_jobs=($(cat ${tfile3} ${tfile4} | rev | cut -d',' -f 1 | rev | sort -u | xargs))
+users_with_jobs=($(cat ${tfile3} ${tfile4} | rev | cut -d',' -f 2 | rev | sort -u | xargs))
 for u in ${users_with_jobs[@]}
 do
-	grep ",${u}" "${tfile3}" | cut -d',' -f 2- > "${tfile2}"
-	grep ",${u}" "${tfile4}" > "${tfile}"
+	grep ",${u}," "${tfile3}" | cut -d',' -f 2- > "${tfile2}"
+	grep ",${u}," "${tfile4}" > "${tfile}"
 	user_p=($(cat ${tfile} ${tfile2} | cut -d',' -f 1 | sort -u | xargs))
         for p in ${user_p[@]}
         do
@@ -242,11 +242,25 @@ do
 	                mem_pending=0
 	                gpu_pending=0
 		else
-	                cores_pending=$(awk -v part=${p} -F, '$1 == part {print $2}' ${tfile} | paste -sd+ | bc)
-	                mem_pending=$(awk -v part=${p} -F, '$1 == part {print $3}' ${tfile} | paste -sd+ | bc)
-	                gpu_pending=$(awk -v part=${p} -F, '$1 == part {print $4}' ${tfile} | paste -sd+ | bc)
-	        fi
-		echo "slurm_user_resource_data,partition=${p},user=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used},cores_pending=${cores_pending},mem_pending=${mem_pending},gpu_pending=${gpu_pending}"
+			cores_pending=0
+                        mem_pending=0
+                        gpu_pending=0
+			while read -r l; do
+				if [ $(echo ${l} | cut -d',' -f 1) == "${p}" ]; then
+					job_num=$(echo ${l} | awk -v part=${p} -F, '$1 == part {print $5}')
+					cores_p=$(echo ${l} |  awk -v part=${p} -F, '$1 == part {print $2}' | paste -sd+ | bc)
+					cores_p_new=$(echo "${cores_p} * ${job_num}" | bc -l)
+			                mem_p=$(echo ${l} | awk -v part=${p} -F, '$1 == part {print $3}' | paste -sd+ | bc)
+					mem_p_new=$(echo "${mem_p} * ${job_num}" | bc -l)
+					gpu_p=$(echo ${l} | awk -v part=${p} -F, '$1 == part {print $4}' | paste -sd+ | bc)
+					gpu_p_new=$(echo "${gpu_p} * ${job_num}" | bc -l)
+					cores_pending=$(echo "${cores_p_new} + ${cores_pending}" | bc -l)
+					mem_pending=$(echo "${mem_p_new} + ${mem_pending}" | bc -l)
+					gpu_pending=$(echo "${gpu_p_new} + ${gpu_pending}" | bc -l)
+				fi
+			done <"${tfile}"
+		fi
+		echo "slurm_user_resource_data,partition=${p},username=${u} cores_used=${cores_used},mem_used_mb=${mem_used},gpus_used=${gpu_used},cores_pending=${cores_pending},mem_pending=${mem_pending},gpu_pending=${gpu_pending}"
 	done
 done
 
