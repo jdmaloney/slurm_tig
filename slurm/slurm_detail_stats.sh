@@ -50,7 +50,7 @@ while read -r p; do
 			user_name=$(echo "${p}" | rev | cut -d',' -f 1 | rev)
 			for n in "${node_list[@]}"
                 	do
-                        	echo "${n},${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile3}"
+                        	echo "${n},${partition},${cpu},${mem_allocated},0,${user_name}," >> "${tfile3}"
 			done
 		## Job uses a GPU(s) so run this
                 else
@@ -73,7 +73,7 @@ while read -r p; do
 			user_name=$(echo "${p}" | rev | cut -d',' -f 1 | rev)
 			for n in "${node_list[@]}"
                 	do
-                        	echo "${n},${partition},${cpu},${mem_allocated},${gpu},${user_name}" >> "${tfile3}"
+                        	echo "${n},${partition},${cpu},${mem_allocated},${gpu},${user_name}," >> "${tfile3}"
 			done
                 fi
 	## The job is not multi-node; continue here as single node
@@ -94,7 +94,7 @@ while read -r p; do
 			partition="$(echo "${p}" | cut -d',' -f 1)"
 			node="$(echo "${p}" | cut -d',' -f 2)"
 			user_name=$(echo "${p}" | rev | cut -d',' -f 1 | rev)
-			echo "${node},${partition},${cpu},${mem_allocated},0,${user_name}" >> "${tfile3}"
+			echo "${node},${partition},${cpu},${mem_allocated},0,${user_name}," >> "${tfile3}"
 		else
 			mem_len=$(echo "${p}" | cut -d'=' -f 3 | sed 's/[^0-9\.]*//g' | wc -c)
                         mem=$(echo "${p}" | cut -d'=' -f 3 | cut -c 1-"${mem_len}")
@@ -112,7 +112,7 @@ while read -r p; do
                         partition=$(echo "${p}" | cut -d',' -f 1)
                         node=$(echo "${p}" | cut -d',' -f 2)
 			user_name=$(echo "${p}" | rev | cut -d',' -f 1 | rev)
-			echo "${node},${partition},${cpu},${mem_allocated},${gpu},${user_name}" >> "${tfile3}"
+			echo "${node},${partition},${cpu},${mem_allocated},${gpu},${user_name}," >> "${tfile3}"
 
 		fi
         fi
