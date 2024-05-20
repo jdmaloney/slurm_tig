@@ -17,7 +17,7 @@ tfile3=$(mktemp /tmp/nodeinfo.XXXXXX)
 tfile4=$(mktemp /tmp/pending.XXXXXX)
 
 ##Dump info about all running jobs into a temp file; get the list of all nodes in the system
-"${slurm_path}"/squeue -t running -O Partition:50,NodeList:250,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile2}"
+"${slurm_path}"/squeue -t running -O Partition:75,NodeList:250,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{print $1","$2","$3","$4}' > "${tfile2}"
 all_node_list=($("${slurm_path}"/sinfo -N | grep -v NODELIST | awk '{print $1}' | sort -u | xargs))
 
 ## Loop over that list of jobs running and get the data formatted in consistent way
@@ -175,7 +175,7 @@ do
 done
 
 ##Dump info about all pending jobs into a temp file
-"${slurm_path}"/squeue -t pending -O Partition:50,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' | sort | uniq -c | sed 's/\ /,/g' | sed 's/^,*//' > "${tfile}"
+"${slurm_path}"/squeue -t pending -O Partition:150,tres-alloc:70,username | grep -v TRES_ALLOC | awk '{gsub(/,/,";",$1); print}' | awk '{print $1","$2","$3","$4}' | sed 's/cpu=//' | sed 's/mem=//' | sed -re 's/(.[0-9])([A-Z],node=.)/\1,\2/' | sort | uniq -c | sed 's/\ /,/g' | sed 's/^,*//' > "${tfile}"
 
 ## Loop over that list of jobs running and get the data formatted in consistent way
 while read -r p; do
