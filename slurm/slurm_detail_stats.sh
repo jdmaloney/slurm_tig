@@ -169,7 +169,7 @@ do
 			mem_used_agg=$(echo "${mem_used_agg} + ${mem_allocated}" | bc -l)
 			gpu_used_agg=$(echo "${gpu_used_agg} + ${gpu_used}" | bc -l)
 		fi
-		echo "slurm_detail_node_data,node=${n},partition=${real_p} job_count=${job_count},cores_used=${cores_used},mem_allocated=${mem_allocated},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used},gpu_avail_total=${gpu_avail},master_state=${master_state},primary_state=${primary_state},other_states=${other_states}"
+		echo "slurm_detail_node_data,node=${n},partition=${real_p} job_count=${job_count},cores_used=${cores_used},mem_allocated=${mem_allocated},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used},gpu_avail_total=${gpu_avail},master_state=\"${master_state}\",primary_state=\"${primary_state}\",other_states=\"${other_states}\""
 	done
 	echo "slurm_detail_node_data,node=${n},partition=all job_count=${job_count_agg},cores_used=${cores_used_agg},mem_allocated=${mem_used_agg},cores_avail_total=${cores_avail},mem_avail_total=${mem_avail},gpu_used=${gpu_used_agg},gpu_avail_total=${gpu_avail}"
 done
