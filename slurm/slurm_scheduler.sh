@@ -83,11 +83,11 @@ do
 		echo "slurm_nodedata,partition=${p} nodes_busy=${alloc_nodes},nodes_idle=${idle_nodes},nodes_offline=${offline_nodes},nodes_total=${total_nodes},percent_offline=${percent_offline}"
 	fi
 
-	users=($(awk '{print $2}' ${tfile2} | sort -u))
+	users=($(awk -v p="$p" '$1==p {print $2}' ${tfile2} | sort -u))
 	for u in ${users[@]}
 	do
-		count_running=$(awk -v u="$u" '$2==u {print $0}' ${tfile2} | awk -v p="$p" '$1==p {print $0}' | awk '$3 == "RUNNING"' |  wc -l)
-		count_pending=$(awk -v u="$u" '$2==u {print $0}' ${tfile2} | awk -v p="$p" '$1==p {print $0}' | awk '$3 == "PENDING"' | wc -l)
+		count_running=$(awk -v u="$u" -v p="$p" '($2==u && $1==p) {print $0}' ${tfile2} | awk '$3 == "RUNNING"' |  wc -l)
+		count_pending=$(awk -v u="$u" -v p="$p" '($2==u && $1==p) {print $0}' ${tfile2} | awk '$3 == "PENDING"' | wc -l)
 		if [ $count_running -ne 0 ]; then
 			echo "slurm_userjobdata,partition=${p},type=running,user=${u} count=$count_running"
 		fi
